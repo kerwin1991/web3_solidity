@@ -10,8 +10,8 @@ contract Bank {
         uint256 amount;
     }
 
-    /// @notice 管理员地址，部署时确定且不可修改。
-    address public immutable admin;
+    /// @notice 管理员地址，部署时为部署者，可通过 transferAdmin 转移。
+    address public admin;
 
     /// @notice 每个地址的累计存款金额。
     mapping(address => uint256) public deposits;
@@ -26,8 +26,11 @@ contract Bank {
     event Deposited(address indexed depositor, uint256 amount, uint256 totalDeposit);
     event TopDepositorsUpdated(address[3] accounts, uint256[3] amounts);
     event Withdrawn(address indexed admin, uint256 amount);
+    event AdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
     error NotAdmin();
+    error IdenticalAdmin();
+    error ZeroAddress();
     error ZeroDeposit();
     error NoFunds();
     error TransferFailed();
@@ -43,8 +46,17 @@ contract Bank {
         _;
     }
 
+    /// @notice 将管理员权限转移给新地址（可以是普通钱包，也可以是合约）。
+    function transferAdmin(address newAdmin) external onlyAdmin {
+        if (newAdmin == address(0)) revert ZeroAddress();
+        if (newAdmin == admin) revert IdenticalAdmin();
+
+        emit AdminTransferred(admin, newAdmin);
+        admin = newAdmin;
+    }
+
     /// @notice 存入 ETH，并更新存款金额前 3 名。
-    function deposit() external payable {
+    function deposit() public payable virtual {
         if (msg.value == 0) revert ZeroDeposit();
 
         uint256 newAmount = deposits[msg.sender] + msg.value;
